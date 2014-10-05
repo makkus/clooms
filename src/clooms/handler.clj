@@ -15,7 +15,7 @@
 
 (defn send-command [bridge group command]
   (let [upd-packets (lights/create-bytes-white-v2 group command)]
-    (doseq [packet upd-packets] (.send socket (create-packet packet (:ip bridge) (:port bridge))))))
+    (doseq [packet upd-packets] (.send socket (create-packet packet (:hostname bridge) (:port bridge))))))
 
 
 (defn list-all-lights

@@ -1,11 +1,29 @@
 (ns clooms.state
   (:require [clooms.lights :as lights]
-            [clooms.lightcontrol :as control])
+            [clooms.lightcontrol :as control]
+            [clooms.db :as db]
+            [korma.core :as korma])
   )
 
 
-(def bridge {:ip "10.0.0.40" :port 8899})
-(def all-lights (ref {"ceiling" (ref{:bridge bridge :group :group_1 :state (ref {})}) "desk" (ref {:bridge bridge :group :group_3 :state (ref {})})}))
+
+(defn find-all-bridges []
+  (let [all (korma/select db/bridges)]
+    (zipmap (map #(:id %) all) all)
+    ))
+
+(def bridge ((find-all-bridges) 1))
+
+;;(def all-lights (ref {"ceiling" (ref{:bridge bridge :group :group_1 :state (ref {})}) "desk" (ref {:bridge bridge :group :group_3 :state (ref {})})}))
+;;(def all-lights {"ceiling" {:bridge bridge :group :group_1 :state (ref {})} "desk" {:bridge bridge :group :group_3 :state (ref {})}})
+
+(defn find-all-lights []
+  (let [all (korma/select db/lights)
+        all-new (map #(assoc % :bridge bridge :state (ref {})) all)]
+    (zipmap (map #(:name %) all-new) all-new)
+  ))
+
+(def all-lights (find-all-lights))
 
 (def queue (ref []))
 
@@ -41,8 +59,8 @@
 (defn status
   "Returns the state of a lightgroup."
   [lightname]
-  (let [light (@all-lights (name lightname))]
-    @(:state @light)
+  (let [light (all-lights (name lightname))]
+    @(:state light)
   ))
 
 (defn property-step
@@ -52,10 +70,10 @@
    (let [shadow-key (keyword (str "shadow-" (name property)))
          property-key (keyword property)
          command (keyword (str (name property) (if increase "_up" "_down")))
-         light (@all-lights (name lightname))
-         state (:state @light)
-         bridge (:bridge @light)
-         group (:group @light)
+         light (all-lights (name lightname))
+         state (:state light)
+         bridge (:bridge light)
+         group (:group light)
          current (property-key @state)
          shadow-property (shadow-key @state)]
 
@@ -128,10 +146,10 @@
   "Turn the nightmode on or of for one lightgroup."
   [lightname on]
   (dosync
-   (let [light (@all-lights (name lightname))
-         state (:state @light)
-         bridge (:bridge @light)
-         group (:group @light)]
+   (let [light (all-lights (name lightname))
+         state (:state light)
+         bridge (:bridge light)
+         group (:group light)]
      (if on
        (do
          (execute bridge group :nightmode)
@@ -155,10 +173,10 @@
   "Switch a lightgroup to full brightness."
   [lightname]
   (dosync
-   (let [light (@all-lights (name lightname))
-         state (:state @light)
-         bridge (:bridge @light)
-         group (:group @light)]
+   (let [light (all-lights (name lightname))
+         state (:state light)
+         bridge (:bridge light)
+         group (:group light)]
          (execute bridge group :full)
          (alter state assoc :on true :brightness 10))
        ))
@@ -167,10 +185,10 @@
   "Switch a lightgroup on or off."
   [lightname on]
   (dosync
-   (let [light (@all-lights (name lightname))
-         state (:state @light)
-         bridge (:bridge @light)
-         group (:group @light)]
+   (let [light (all-lights (name lightname))
+         state (:state light)
+         bridge (:bridge light)
+         group (:group light)]
      (execute bridge group (if on :on :off))
      (alter state assoc :on on :nightmode false)
      )))
@@ -186,8 +204,8 @@
 (defn calibrate
   "Calibrate a lightgroup."
   [lightname]
-  (let [light (@all-lights (name lightname))
-        state (:state @light)]
+  (let [light (all-lights (name lightname))
+        state (:state light)]
     (if (nil? (:brightness @state))
       (switch-full lightname))
     (if (nil? (:warmth @state))
@@ -198,8 +216,8 @@
   "Sets the brightness of a lightgroup to a value."
   [lightname brightness]
   (calibrate lightname)
-  (let [light (@all-lights (name lightname))
-        state (:state @light)
+  (let [light (all-lights (name lightname))
+        state (:state light)
         current-brightness (:brightness @state)
         diff (- brightness current-brightness)]
     (if (< diff 0)
@@ -212,8 +230,8 @@
   "Sets the brightness of a lightgroup to a value."
   [lightname warmth]
   (calibrate lightname)
-  (let [light (@all-lights (name lightname))
-        state (:state @light)
+  (let [light (all-lights (name lightname))
+        state (:state light)
         current-warmth (:warmth @state)
         diff (- warmth current-warmth)]
     (if (< diff 0)
