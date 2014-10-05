@@ -1,0 +1,19 @@
+bridges:
+        - id: 1
+          name:         "main"
+          hostname:     "10.0.0.40"
+          port:         8899
+
+lights:
+        - id: 1
+          name:         "ceiling"
+          group:        1
+          bridge-id:    1
+        - id: 2
+          name:         "bed"
+          group:        2
+          bridge-id:    1
+        - id: 3
+          name:         "desk"
+          group:        3
+          bridge-id:    1
