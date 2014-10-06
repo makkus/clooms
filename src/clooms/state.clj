@@ -64,7 +64,8 @@
   ))
 
 (defn property-step
-  "Changing either brightness or warmth one step up or down. Managing internal state at the same time"
+  "Changing either brightness or warmth one step up or down. Managing internal state at the sa
+  me time"
   [property lightname increase]
   (dosync 
    (let [shadow-key (keyword (str "shadow-" (name property)))

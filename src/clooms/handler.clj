@@ -7,6 +7,7 @@
             [ring.middleware.json :as middleware]
             [compojure.handler :as handler]
             [clooms.lights :as lights]
+            [clooms.state :as state]
             [compojure.route :as route]))
 
 (def socket (DatagramSocket.))
@@ -17,10 +18,17 @@
   (let [upd-packets (lights/create-bytes-white-v2 group command)]
     (doseq [packet upd-packets] (.send socket (create-packet packet (:hostname bridge) (:port bridge))))))
 
+(defn deref-walk [x] 
+  (clojure.walk/prewalk 
+    (fn [e] 
+      (if (instance? clojure.lang.Ref e) 
+        (deref-walk (deref e)) 
+        e)) 
+    x))
 
 (defn list-all-lights
   []
-  (response "xxx"))
+  (response  (state/all-lights)))
 
 (defroutes app-routes
   (GET "/lights" [] (list-all-lights))
