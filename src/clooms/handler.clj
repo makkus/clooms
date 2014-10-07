@@ -18,24 +18,20 @@
   (let [upd-packets (lights/create-bytes-white-v2 group command)]
     (doseq [packet upd-packets] (.send socket (create-packet packet (:hostname bridge) (:port bridge))))))
 
-(defn deref-walk [x] 
-  (clojure.walk/prewalk 
-    (fn [e] 
-      (if (instance? clojure.lang.Ref e) 
-        (deref-walk (deref e)) 
-        e)) 
-    x))
 
-(defn list-all-lights
-  []
-  (response  (state/all-lights)))
+(defroutes light-routes
+  (context "/light" []
+           (GET "/" [] (response (state/get-all-lights-with-current-state)))
+           (GET "/:light-name" [light-name] (response (state/get-light light-name)))
+           (POST "/:light-name/:action" [light-name action] (response (state/do-action-on-light light-name action)))
+           (POST "/:light-name/:action/:param" [light-name action param] (response (state/do-action-on-light light-name action param)))
+           ))
 
 (defroutes app-routes
-  (GET "/lights" [] (list-all-lights))
   (route/not-found "Not Found"))
 
 (def app
-  (-> (handler/api app-routes)
+  (-> (handler/api (routes light-routes app-routes))
       (middleware/wrap-json-body)
       (middleware/wrap-json-response))
   )

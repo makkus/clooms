@@ -21,7 +21,25 @@
   (let [all (korma/select db/lights)
         all-new (map #(assoc % :bridge bridge :state (ref {})) all)]
     (zipmap (map #(:name %) all-new) all-new)
-  ))
+    ))
+
+(defn deref-walk [x] 
+  (clojure.walk/prewalk 
+   (fn [e] 
+     (if (instance? clojure.lang.Ref e) 
+       (deref-walk (deref e)) 
+       e)) 
+   x))
+
+(defn get-all-lights-with-current-state
+  []
+  "Returns a dereffed list of all lights, including their current states if they are known."
+  (deref-walk all-lights)
+  )
+
+(defn get-light
+  [lightname]
+  (deref-walk (all-lights (name lightname))))
 
 (def all-lights (find-all-lights))
 
@@ -31,29 +49,29 @@
   []
   (dosync
    (let [next (first @queue)]
-   (if (not (empty? @queue)) (alter queue pop))
-   (if (not (nil? next))
-     (do
-       (apply control/send-command next)
-       (Thread/sleep 100)
-       )))
-  ))
+     (if (not (empty? @queue)) (alter queue pop))
+     (if (not (nil? next))
+       (do
+         (apply control/send-command next)
+         (Thread/sleep 100)
+         )))
+   ))
 
 (defn add-to-queue
   [command-tupel]
   (.start (Thread. (fn [] 
-  (dosync
-   (alter queue conj command-tupel)
-   (while (not (empty? @queue))
-     (work-on-next-queue-item))
-   )))))
+                     (dosync
+                      (alter queue conj command-tupel)
+                      (while (not (empty? @queue))
+                        (work-on-next-queue-item))
+                      )))))
 
 (defn execute
   [bridge group command]
   (add-to-queue [bridge group command])
-;;  (println "QUEUE: "@queue)
-;;  (work-on-next-queue-item)
-;;  (println "QUEUE: "@queue)
+  ;;  (println "QUEUE: "@queue)
+  ;;  (work-on-next-queue-item)
+  ;;  (println "QUEUE: "@queue)
   )
 
 (defn status
@@ -61,7 +79,7 @@
   [lightname]
   (let [light (all-lights (name lightname))]
     @(:state light)
-  ))
+    ))
 
 (defn property-step
   "Changing either brightness or warmth one step up or down. Managing internal state at the sa
@@ -93,23 +111,23 @@
                (cond
                 (>= new-shadow-property 10) (do
                                               (alter state assoc property-key 10)
-                                             (alter state dissoc shadow-key))
-               (<= new-shadow-property -10) (do
-                                              (alter state assoc property-key 0)
-                                              (alter state dissoc shadow-key)
-                                              ))))))
-      ;; manage real brightness
-      (do
-        (if (or (and (< current 10) increase) (and (> current 0) (not increase)))
-          (alter state assoc property-key (if increase (inc current) (dec current))))
-    )))))
+                                              (alter state dissoc shadow-key))
+                (<= new-shadow-property -10) (do
+                                               (alter state assoc property-key 0)
+                                               (alter state dissoc shadow-key)
+                                               ))))))
+       ;; manage real brightness
+       (do
+         (if (or (and (< current 10) increase) (and (> current 0) (not increase)))
+           (alter state assoc property-key (if increase (inc current) (dec current))))
+         )))))
 
 
 (defn brightness-step
   "Increase or decrease the brightness of one lightgroup."
   [lightname brighter]
   (property-step :brightness lightname brighter)
-)
+  )
 
 (defn brightness-up
   "Increase the brightness of a lightgroup by x steps."
@@ -178,9 +196,9 @@
          state (:state light)
          bridge (:bridge light)
          group (:group light)]
-         (execute bridge group :full)
-         (alter state assoc :on true :brightness 10))
-       ))
+     (execute bridge group :full)
+     (alter state assoc :on true :brightness 10))
+   ))
 
 (defn switch
   "Switch a lightgroup on or off."
@@ -215,17 +233,18 @@
 
 (defn set-brightness
   "Sets the brightness of a lightgroup to a value."
-  [lightname brightness]
+  [lightname brightness-str]
   (calibrate lightname)
-  (let [light (all-lights (name lightname))
-        state (:state light)
-        current-brightness (:brightness @state)
-        diff (- brightness current-brightness)]
-    (if (< diff 0)
-      (brightness-down lightname (- diff))
-      (if (> diff 0) (brightness-up lightname diff)))
-    )
-  )
+  (let [brightness (read-string brightness-str)]
+    (let [light (all-lights (name lightname))
+          state (:state light)
+          current-brightness (:brightness @state)
+          diff (- brightness current-brightness)]
+      (if (< diff 0)
+        (brightness-down lightname (- diff))
+        (if (> diff 0) (brightness-up lightname diff)))
+      )
+    ))
 
 (defn set-warmth
   "Sets the brightness of a lightgroup to a value."
@@ -240,6 +259,20 @@
       (if (> diff 0) (warmth-up lightname diff)))
     )
   )
+
+(defn do-action-on-light
+  [light actionname & params]
+  (let [action (keyword actionname)]
+    (case action
+      :switch-on (switch-on light)
+      :switch-off (switch-off light)
+      :switch-full (switch-full light)
+      :set-brightness (set-brightness light (first params))
+      :set-warmth (set-warmth light (first params))
+      (status light)
+      )))
+
+
 
 
 
