@@ -5,8 +5,6 @@
             [korma.core :as korma])
   )
 
-
-
 (defn find-all-bridges []
   (let [all (korma/select db/bridges)]
     (zipmap (map #(:id %) all) all)
@@ -22,6 +20,8 @@
         all-new (map #(assoc % :bridge bridge :state (ref {})) all)]
     (zipmap (map #(:name %) all-new) all-new)
     ))
+
+(def all-lights (find-all-lights))
 
 (defn deref-walk [x] 
   (clojure.walk/prewalk 
@@ -59,16 +59,19 @@
 
 (defn add-to-queue
   [command-tupel]
-  (.start (Thread. (fn [] 
+;  (.start (Thread. (fn [] 
                      (dosync
                       (alter queue conj command-tupel)
                       (while (not (empty? @queue))
                         (work-on-next-queue-item))
-                      )))))
+                      )
+;          ))))
+  )
 
 (defn execute
   [bridge group command]
-  (add-to-queue [bridge group command])
+  (do
+    (add-to-queue [bridge group command]))
   ;;  (println "QUEUE: "@queue)
   ;;  (work-on-next-queue-item)
   ;;  (println "QUEUE: "@queue)
@@ -120,7 +123,8 @@
        (do
          (if (or (and (< current 10) increase) (and (> current 0) (not increase)))
            (alter state assoc property-key (if increase (inc current) (dec current))))
-         )))))
+         ))))
+  (status lightname))
 
 
 (defn brightness-step
@@ -134,15 +138,15 @@
   [lightname steps]
   (dotimes [num steps]
     (brightness-step lightname true)
-    ())
   )
+  (status lightname))
 
 (defn brightness-down
   "Increase the brightness of a lightgroup by x steps."
   [lightname steps]
   (dotimes [num steps]
     (brightness-step lightname false))
-  )
+  (status lightname))
 
 (defn warmth-step
   "Increase or decrease the warmth of one lightgroup."
@@ -153,13 +157,15 @@
   "Increase the warmth of a lightgroup by x steps."
   [lightname steps]
   (dotimes [num steps]
-    (warmth-step lightname true)))
+    (warmth-step lightname true))
+  (status lightname))
 
 (defn warmth-down
   "Decrease the warmth of a lightgroup by x steps."
   [lightname steps]
   (dotimes [num steps]
-    (warmth-step lightname false)))
+    (warmth-step lightname false))
+  (status lightname))
 
 (defn nightmode
   "Turn the nightmode on or of for one lightgroup."
@@ -233,18 +239,18 @@
 
 (defn set-brightness
   "Sets the brightness of a lightgroup to a value."
-  [lightname brightness-str]
+  [lightname brightness]
   (calibrate lightname)
-  (let [brightness (read-string brightness-str)]
     (let [light (all-lights (name lightname))
           state (:state light)
           current-brightness (:brightness @state)
           diff (- brightness current-brightness)]
       (if (< diff 0)
         (brightness-down lightname (- diff))
-        (if (> diff 0) (brightness-up lightname diff)))
+        (if (> diff 0)
+          (brightness-up lightname diff)))
       )
-    ))
+    )
 
 (defn set-warmth
   "Sets the brightness of a lightgroup to a value."

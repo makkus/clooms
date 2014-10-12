@@ -10,13 +10,19 @@
 
 (defdb db db-spec)
 
+(defrecord Bridge [id name hostname port])
+(defrecord Light [id name group bridge-id])
+
 (defentity bridges
-  (entity-fields :id :name :hostname :port))
+  (entity-fields :id :name :hostname :port)
+  (transform #(Bridge. (:id %) (:name %) (:hostname %) (:port %)))
+  )
  
 (defentity lights
-  (entity-fields :name :group :bridge-id)
+  (entity-fields :id :name :group :bridge-id)
   (belongs-to bridges {:fk :bridge-id})
-  (transform #(assoc % :group (keyword (str "group_" (:group %)))))
+  (transform #(Light. (:id %) (:name %) (keyword  (str "group_" (:group %))) (:bridge-id %)))
+;  (transform #(Light. (:id %) (:name %) (:group (keyword (str "group_" (:group %)))) (:bridge-id %)))
   )
   
 

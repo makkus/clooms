@@ -7,7 +7,8 @@
 
 (def socket (DatagramSocket.))
 
-(defn create-packet [command-bytes hostname port] (new DatagramPacket command-bytes (alength command-bytes) (InetAddress/getByName hostname) port))
+(defn create-packet [command-bytes hostname port]
+  (new DatagramPacket command-bytes (alength command-bytes) (InetAddress/getByName hostname) port))
 
 (defn send-command [bridge group command]
   (let [upd-packets (lights/create-bytes-white-v2 group command)]
